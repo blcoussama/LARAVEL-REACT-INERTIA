@@ -15,7 +15,7 @@ export default function Index({ auth, success, tasks, queryParams = null }) {
           </h2>
           <Link
             href={route("task.create")}
-            className="bg-emerald-500 py-1 px-3 text-white rounded shadow transition-all hover:bg-emerald-600"
+            className="bg-emerald-500 py-1 px-3 text-white rounded-sm shadow-sm transition-all hover:bg-emerald-600"
           >
             Add new
           </Link>
@@ -26,7 +26,7 @@ export default function Index({ auth, success, tasks, queryParams = null }) {
 
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-xs sm:rounded-lg">
             <div className="p-6 text-gray-900 dark:text-gray-100">
               <TasksTable
                 tasks={tasks}

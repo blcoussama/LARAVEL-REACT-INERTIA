@@ -17,7 +17,7 @@ export default function Show({ auth, task }) {
           </h2>
           <Link
             href={route("task.edit", task.id)}
-            className="bg-emerald-500 py-1 px-3 text-white rounded shadow transition-all hover:bg-emerald-600"
+            className="bg-emerald-500 py-1 px-3 text-white rounded-sm shadow-sm transition-all hover:bg-emerald-600"
           >
             Edit
           </Link>
@@ -27,7 +27,7 @@ export default function Show({ auth, task }) {
       <Head title={`Task "${task.name}"`} />
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-xs sm:rounded-lg">
             <div>
               <img
                 src={task.image_path}
@@ -52,7 +52,7 @@ export default function Show({ auth, task }) {
                     <p className="mt-1">
                       <span
                         className={
-                          "px-2 py-1 rounded text-white " +
+                          "px-2 py-1 rounded-sm text-white " +
                           TASK_STATUS_CLASS_MAP[task.status]
                         }
                       >
@@ -66,7 +66,7 @@ export default function Show({ auth, task }) {
                     <p className="mt-1">
                       <span
                         className={
-                          "px-2 py-1 rounded text-white " +
+                          "px-2 py-1 rounded-sm text-white " +
                           TASK_PRIORITY_CLASS_MAP[task.priority]
                         }
                       >

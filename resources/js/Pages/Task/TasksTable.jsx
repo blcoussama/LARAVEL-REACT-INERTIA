@@ -52,7 +52,7 @@ export default function TasksTable({
   return (
     <>
       {success && (
-        <div className="bg-emerald-500 py-2 px-4 text-white rounded mb-4">
+        <div className="bg-emerald-500 py-2 px-4 text-white rounded-sm mb-4">
           {success}
         </div>
       )}
@@ -162,7 +162,7 @@ export default function TasksTable({
                 <td className="px-3 py-2">
                   <span
                     className={
-                      "px-2 py-1 rounded text-nowrap text-white " +
+                      "px-2 py-1 rounded-sm text-nowrap text-white " +
                       TASK_STATUS_CLASS_MAP[task.status]
                     }
                   >
