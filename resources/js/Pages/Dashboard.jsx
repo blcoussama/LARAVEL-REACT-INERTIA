@@ -3,7 +3,6 @@ import { TASK_STATUS_CLASS_MAP, TASK_STATUS_TEXT_MAP } from "@/constants";
 import { Head, Link } from "@inertiajs/react";
 
 export default function Dashboard({
-  auth,
   totalPendingTasks,
   myPendingTasks,
   totalProgressTasks,
@@ -14,7 +13,6 @@ export default function Dashboard({
 }) {
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
           Dashboard
@@ -62,9 +60,17 @@ export default function Dashboard({
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-4">
           <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-xs sm:rounded-lg">
             <div className="p-6 text-gray-900 dark:text-gray-100">
-              <h3 className="text-gray-200 text-xl font-semibold">
-                My Active Tasks
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-gray-200 text-xl font-semibold">
+                  My Active Tasks
+                </h3>
+                <Link
+                  href={route("task.myTasks")}
+                  className="text-sm text-blue-500 hover:underline"
+                >
+                  View all my tasks
+                </Link>
+              </div>
 
               <table className="mt-3 w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 border-b-2 border-gray-500">
@@ -77,6 +83,13 @@ export default function Dashboard({
                   </tr>
                 </thead>
                 <tbody>
+                  {activeTasks.data.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center">
+                        No active task assigned to you.
+                      </td>
+                    </tr>
+                  )}
                   {activeTasks.data.map((task) => (
                     <tr key={task.id}>
                       <td className="px-3 py-2">{task.id}</td>

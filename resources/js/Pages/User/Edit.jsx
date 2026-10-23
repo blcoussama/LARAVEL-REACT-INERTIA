@@ -1,15 +1,15 @@
 import InputError from "@/Components/InputError";
 import InputLabel from "@/Components/InputLabel";
 import SelectInput from "@/Components/SelectInput";
-import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
-export default function Create({ auth, user }) {
-  const { data, setData, post, errors, reset } = useForm({
+export default function Edit({ user, roles }) {
+  const { data, setData, post, errors } = useForm({
     name: user.name || "",
     email: user.email || "",
+    role: user.role || "member",
     password: "",
     password_confirmation: "",
     _method: "PUT",
@@ -23,7 +23,6 @@ export default function Create({ auth, user }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -72,7 +71,35 @@ export default function Create({ auth, user }) {
               </div>
 
               <div className="mt-4">
-                <InputLabel htmlFor="user_password" value="Password" />
+                <InputLabel htmlFor="user_role" value="Role" />
+
+                <SelectInput
+                  id="user_role"
+                  name="role"
+                  value={data.role}
+                  disabled={!user.can.changeRole}
+                  className="mt-1 block w-full disabled:opacity-60"
+                  onChange={(e) => setData("role", e.target.value)}
+                >
+                  {roles.map((role) => (
+                    <option value={role} key={role}>
+                      {role === "admin" ? "Admin" : "Member"}
+                    </option>
+                  ))}
+                </SelectInput>
+                {!user.can.changeRole && (
+                  <p className="mt-2 text-sm text-gray-400">
+                    You cannot change your own role.
+                  </p>
+                )}
+                <InputError message={errors.role} className="mt-2" />
+              </div>
+
+              <div className="mt-4">
+                <InputLabel
+                  htmlFor="user_password"
+                  value="New Password (leave empty to keep the current one)"
+                />
 
                 <TextInput
                   id="user_password"

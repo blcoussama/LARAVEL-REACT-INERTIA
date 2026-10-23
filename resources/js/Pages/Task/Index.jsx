@@ -4,14 +4,20 @@ import { Head, Link } from "@inertiajs/react";
 
 import TasksTable from "./TasksTable";
 
-export default function Index({ auth, success, tasks, queryParams = null }) {
+export default function Index({
+  success,
+  tasks,
+  queryParams = null,
+  myTasks = false,
+}) {
+  const title = myTasks ? "My Tasks" : "Tasks";
+
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            Tasks
+            {title}
           </h2>
           <Link
             href={route("task.create")}
@@ -22,7 +28,7 @@ export default function Index({ auth, success, tasks, queryParams = null }) {
         </div>
       }
     >
-      <Head title="Tasks" />
+      <Head title={title} />
 
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -32,6 +38,8 @@ export default function Index({ auth, success, tasks, queryParams = null }) {
                 tasks={tasks}
                 queryParams={queryParams}
                 success={success}
+                routeName={myTasks ? "task.myTasks" : "task.index"}
+                hideAssigneeColumn={myTasks}
               />
             </div>
           </div>

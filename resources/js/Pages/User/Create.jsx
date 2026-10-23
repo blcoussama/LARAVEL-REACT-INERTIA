@@ -1,13 +1,15 @@
 import InputError from "@/Components/InputError";
 import InputLabel from "@/Components/InputLabel";
+import SelectInput from "@/Components/SelectInput";
 import TextInput from "@/Components/TextInput";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
-export default function Create({ auth }) {
-  const { data, setData, post, errors, reset } = useForm({
+export default function Create({ roles }) {
+  const { data, setData, post, errors } = useForm({
     name: "",
     email: "",
+    role: "member",
     password: "",
     password_confirmation: "",
   });
@@ -20,7 +22,6 @@ export default function Create({ auth }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -66,6 +67,25 @@ export default function Create({ auth }) {
                 />
 
                 <InputError message={errors.email} className="mt-2" />
+              </div>
+
+              <div className="mt-4">
+                <InputLabel htmlFor="user_role" value="Role" />
+
+                <SelectInput
+                  id="user_role"
+                  name="role"
+                  value={data.role}
+                  className="mt-1 block w-full disabled:opacity-60"
+                  onChange={(e) => setData("role", e.target.value)}
+                >
+                  {roles.map((role) => (
+                    <option value={role} key={role}>
+                      {role === "admin" ? "Admin" : "Member"}
+                    </option>
+                  ))}
+                </SelectInput>
+                <InputError message={errors.role} className="mt-2" />
               </div>
 
               <div className="mt-4">

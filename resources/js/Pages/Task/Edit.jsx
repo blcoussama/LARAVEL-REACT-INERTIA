@@ -6,7 +6,7 @@ import TextInput from "@/Components/TextInput";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
-export default function Create({ auth, task, projects, users }) {
+export default function Edit({ task, projects, users }) {
   const { data, setData, post, errors, reset } = useForm({
     image: "",
     name: task.name || "",
@@ -27,7 +27,6 @@ export default function Create({ auth, task, projects, users }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -47,7 +46,7 @@ export default function Create({ auth, task, projects, users }) {
             >
               {task.image_path && (
                 <div className="mb-4">
-                  <img src={task.image_path} className="w-64" />
+                  <img src={task.image_path} alt="" className="w-64" />
                 </div>
               )}
               <div>
@@ -142,7 +141,7 @@ export default function Create({ auth, task, projects, users }) {
                   <option value="completed">Completed</option>
                 </SelectInput>
 
-                <InputError message={errors.task_status} className="mt-2" />
+                <InputError message={errors.status} className="mt-2" />
               </div>
 
               <div className="mt-4">

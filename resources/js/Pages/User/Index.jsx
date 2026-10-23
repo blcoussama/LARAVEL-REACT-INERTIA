@@ -4,8 +4,9 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router } from "@inertiajs/react";
 import TableHeading from "@/Components/TableHeading";
 
-export default function Index({ auth, users, queryParams = null, success }) {
-  queryParams = queryParams || {};
+export default function Index({ users, queryParams = null, success }) {
+  queryParams = { ...(queryParams || {}) };
+  delete queryParams.page;
   const searchFieldChanged = (name, value) => {
     if (value) {
       queryParams[name] = value;
@@ -13,7 +14,10 @@ export default function Index({ auth, users, queryParams = null, success }) {
       delete queryParams[name];
     }
 
-    router.get(route("user.index"), queryParams);
+    router.get(route("user.index"), queryParams, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
   const onKeyPress = (name, e) => {
@@ -33,7 +37,10 @@ export default function Index({ auth, users, queryParams = null, success }) {
       queryParams.sort_field = name;
       queryParams.sort_direction = "asc";
     }
-    router.get(route("user.index"), queryParams);
+    router.get(route("user.index"), queryParams, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
   const deleteUser = (user) => {
@@ -45,7 +52,6 @@ export default function Index({ auth, users, queryParams = null, success }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -102,6 +108,15 @@ export default function Index({ auth, users, queryParams = null, success }) {
                       </TableHeading>
 
                       <TableHeading
+                        name="role"
+                        sort_field={queryParams.sort_field}
+                        sort_direction={queryParams.sort_direction}
+                        sortChanged={sortChanged}
+                      >
+                        Role
+                      </TableHeading>
+
+                      <TableHeading
                         name="created_at"
                         sort_field={queryParams.sort_field}
                         sort_direction={queryParams.sort_direction}
@@ -140,6 +155,7 @@ export default function Index({ auth, users, queryParams = null, success }) {
                       </th>
                       <th className="px-3 py-3"></th>
                       <th className="px-3 py-3"></th>
+                      <th className="px-3 py-3"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -149,26 +165,44 @@ export default function Index({ auth, users, queryParams = null, success }) {
                         key={user.id}
                       >
                         <td className="px-3 py-2">{user.id}</td>
-                        <th className="px-3 py-2 text-gray-100 text-nowrap">
-                          {user.name}
+                        <th className="px-3 py-2 text-gray-100 text-nowrap hover:underline">
+                          <Link href={route("user.show", user.id)}>
+                            {user.name}
+                          </Link>
                         </th>
                         <td className="px-3 py-2">{user.email}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={
+                              "px-2 py-1 rounded-sm text-white text-nowrap " +
+                              (user.role === "admin"
+                                ? "bg-indigo-600"
+                                : "bg-gray-600")
+                            }
+                          >
+                            {user.role === "admin" ? "Admin" : "Member"}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-nowrap">
                           {user.created_at}
                         </td>
-                        <td className="px-3 py-2 text-nowrap">
-                          <Link
-                            href={route("user.edit", user.id)}
-                            className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
-                          >
-                            Edit
-                          </Link>
-                          <button
-                            onClick={(e) => deleteUser(user)}
-                            className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
-                          >
-                            Delete
-                          </button>
+                        <td className="px-3 py-2 text-nowrap text-right">
+                          {user.can.update && (
+                            <Link
+                              href={route("user.edit", user.id)}
+                              className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
+                            >
+                              Edit
+                            </Link>
+                          )}
+                          {user.can.delete && (
+                            <button
+                              onClick={() => deleteUser(user)}
+                              className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

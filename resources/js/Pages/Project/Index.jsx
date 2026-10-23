@@ -8,9 +8,11 @@ import {
 } from "@/constants.js";
 import { Head, Link, router } from "@inertiajs/react";
 import TableHeading from "@/Components/TableHeading";
+import Thumbnail from "@/Components/Thumbnail";
 
-export default function Index({ auth, projects, queryParams = null, success }) {
-  queryParams = queryParams || {};
+export default function Index({ projects, queryParams = null, success }) {
+  queryParams = { ...(queryParams || {}) };
+  delete queryParams.page;
   const searchFieldChanged = (name, value) => {
     if (value) {
       queryParams[name] = value;
@@ -18,7 +20,10 @@ export default function Index({ auth, projects, queryParams = null, success }) {
       delete queryParams[name];
     }
 
-    router.get(route("project.index"), queryParams);
+    router.get(route("project.index"), queryParams, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
   const onKeyPress = (name, e) => {
@@ -38,7 +43,10 @@ export default function Index({ auth, projects, queryParams = null, success }) {
       queryParams.sort_field = name;
       queryParams.sort_direction = "asc";
     }
-    router.get(route("project.index"), queryParams);
+    router.get(route("project.index"), queryParams, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
   const deleteProject = (project) => {
@@ -50,7 +58,6 @@ export default function Index({ auth, projects, queryParams = null, success }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -171,7 +178,11 @@ export default function Index({ auth, projects, queryParams = null, success }) {
                       >
                         <td className="px-3 py-2">{project.id}</td>
                         <td className="px-3 py-2">
-                          <img src={project.image_path} style={{ width: 60 }} />
+                          <Thumbnail
+                            src={project.image_path}
+                            name={project.name}
+                            className="w-14 h-10 rounded-sm"
+                          />
                         </td>
                         <th className="px-3 py-2 text-gray-100 text-nowrap hover:underline">
                           <Link href={route("project.show", project.id)}>
@@ -194,20 +205,26 @@ export default function Index({ auth, projects, queryParams = null, success }) {
                         <td className="px-3 py-2 text-nowrap">
                           {project.due_date}
                         </td>
-                        <td className="px-3 py-2">{project.createdBy.name}</td>
                         <td className="px-3 py-2 text-nowrap">
-                          <Link
-                            href={route("project.edit", project.id)}
-                            className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
-                          >
-                            Edit
-                          </Link>
-                          <button
-                            onClick={(e) => deleteProject(project)}
-                            className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
-                          >
-                            Delete
-                          </button>
+                          {project.createdBy?.name ?? "Deleted user"}
+                        </td>
+                        <td className="px-3 py-2 text-nowrap text-right">
+                          {project.can.update && (
+                            <Link
+                              href={route("project.edit", project.id)}
+                              className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
+                            >
+                              Edit
+                            </Link>
+                          )}
+                          {project.can.delete && (
+                            <button
+                              onClick={() => deleteProject(project)}
+                              className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

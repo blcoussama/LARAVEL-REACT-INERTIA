@@ -2,16 +2,39 @@ import Pagination from "@/Components/Pagination";
 import SelectInput from "@/Components/SelectInput";
 import TextInput from "@/Components/TextInput";
 import TableHeading from "@/Components/TableHeading";
-import { TASK_STATUS_CLASS_MAP, TASK_STATUS_TEXT_MAP } from "@/constants.js";
+import Thumbnail from "@/Components/Thumbnail";
+import {
+  TASK_PRIORITY_CLASS_MAP,
+  TASK_PRIORITY_TEXT_MAP,
+  TASK_STATUS_CLASS_MAP,
+  TASK_STATUS_TEXT_MAP,
+} from "@/constants.js";
 import { Link, router } from "@inertiajs/react";
 
+/**
+ * Table of tasks shared by the task list, "My Tasks", the project page and
+ * the user page. Filters and sorting reload the page that hosts the table:
+ * pass its route with `routeName` / `routeParams`.
+ */
 export default function TasksTable({
   tasks,
   success,
   queryParams = null,
   hideProjectColumn = false,
+  hideAssigneeColumn = false,
+  routeName = "task.index",
+  routeParams = {},
 }) {
-  queryParams = queryParams || {};
+  queryParams = { ...(queryParams || {}) };
+  delete queryParams.page;
+
+  const reload = () => {
+    router.get(route(routeName, routeParams), queryParams, {
+      preserveState: true,
+      preserveScroll: true,
+    });
+  };
+
   const searchFieldChanged = (name, value) => {
     if (value) {
       queryParams[name] = value;
@@ -19,7 +42,7 @@ export default function TasksTable({
       delete queryParams[name];
     }
 
-    router.get(route("task.index"), queryParams);
+    reload();
   };
 
   const onKeyPress = (name, e) => {
@@ -30,16 +53,13 @@ export default function TasksTable({
 
   const sortChanged = (name) => {
     if (name === queryParams.sort_field) {
-      if (queryParams.sort_direction === "asc") {
-        queryParams.sort_direction = "desc";
-      } else {
-        queryParams.sort_direction = "asc";
-      }
+      queryParams.sort_direction =
+        queryParams.sort_direction === "asc" ? "desc" : "asc";
     } else {
       queryParams.sort_field = name;
       queryParams.sort_direction = "asc";
     }
-    router.get(route("task.index"), queryParams);
+    reload();
   };
 
   const deleteTask = (task) => {
@@ -48,6 +68,9 @@ export default function TasksTable({
     }
     router.delete(route("task.destroy", task.id));
   };
+
+  const columnCount =
+    9 - (hideProjectColumn ? 1 : 0) - (hideAssigneeColumn ? 1 : 0);
 
   return (
     <>
@@ -91,12 +114,12 @@ export default function TasksTable({
               </TableHeading>
 
               <TableHeading
-                name="created_at"
+                name="priority"
                 sort_field={queryParams.sort_field}
                 sort_direction={queryParams.sort_direction}
                 sortChanged={sortChanged}
               >
-                Create Date
+                Priority
               </TableHeading>
 
               <TableHeading
@@ -107,6 +130,9 @@ export default function TasksTable({
               >
                 Due Date
               </TableHeading>
+              {!hideAssigneeColumn && (
+                <th className="px-3 py-3">Assigned To</th>
+              )}
               <th className="px-3 py-3">Created By</th>
               <th className="px-3 py-3 text-right">Actions</th>
             </tr>
@@ -127,7 +153,7 @@ export default function TasksTable({
               </th>
               <th className="px-3 py-3">
                 <SelectInput
-                  className="w-full"
+                  className="w-full min-w-40"
                   defaultValue={queryParams.status}
                   onChange={(e) => searchFieldChanged("status", e.target.value)}
                 >
@@ -139,11 +165,19 @@ export default function TasksTable({
               </th>
               <th className="px-3 py-3"></th>
               <th className="px-3 py-3"></th>
+              {!hideAssigneeColumn && <th className="px-3 py-3"></th>}
               <th className="px-3 py-3"></th>
               <th className="px-3 py-3"></th>
             </tr>
           </thead>
           <tbody>
+            {tasks.data.length === 0 && (
+              <tr>
+                <td colSpan={columnCount} className="px-3 py-6 text-center">
+                  No tasks found.
+                </td>
+              </tr>
+            )}
             {tasks.data.map((task) => (
               <tr
                 className="bg-white border-b dark:bg-gray-800 dark:border-gray-700"
@@ -151,10 +185,18 @@ export default function TasksTable({
               >
                 <td className="px-3 py-2">{task.id}</td>
                 <td className="px-3 py-2">
-                  <img src={task.image_path} style={{ width: 60 }} />
+                  <Thumbnail
+                    src={task.image_path}
+                    name={task.name}
+                    className="w-14 h-10 rounded-sm"
+                  />
                 </td>
                 {!hideProjectColumn && (
-                  <td className="px-3 py-2">{task.project.name}</td>
+                  <td className="px-3 py-2 hover:underline">
+                    <Link href={route("project.show", task.project.id)}>
+                      {task.project.name}
+                    </Link>
+                  </td>
                 )}
                 <th className="px-3 py-2 text-gray-100 hover:underline">
                   <Link href={route("task.show", task.id)}>{task.name}</Link>
@@ -169,22 +211,42 @@ export default function TasksTable({
                     {TASK_STATUS_TEXT_MAP[task.status]}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-nowrap">{task.created_at}</td>
+                <td className="px-3 py-2">
+                  <span
+                    className={
+                      "px-2 py-1 rounded-sm text-nowrap text-white " +
+                      TASK_PRIORITY_CLASS_MAP[task.priority]
+                    }
+                  >
+                    {TASK_PRIORITY_TEXT_MAP[task.priority]}
+                  </span>
+                </td>
                 <td className="px-3 py-2 text-nowrap">{task.due_date}</td>
-                <td className="px-3 py-2">{task.createdBy.name}</td>
+                {!hideAssigneeColumn && (
+                  <td className="px-3 py-2 text-nowrap">
+                    {task.assignedUser?.name ?? "Unassigned"}
+                  </td>
+                )}
                 <td className="px-3 py-2 text-nowrap">
-                  <Link
-                    href={route("task.edit", task.id)}
-                    className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={(e) => deleteTask(task)}
-                    className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
-                  >
-                    Delete
-                  </button>
+                  {task.createdBy?.name ?? "Deleted user"}
+                </td>
+                <td className="px-3 py-2 text-nowrap text-right">
+                  {task.can.update && (
+                    <Link
+                      href={route("task.edit", task.id)}
+                      className="font-medium text-blue-600 dark:text-blue-500 hover:underline mx-1"
+                    >
+                      Edit
+                    </Link>
+                  )}
+                  {task.can.delete && (
+                    <button
+                      onClick={() => deleteTask(task)}
+                      className="font-medium text-red-600 dark:text-red-500 hover:underline mx-1"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

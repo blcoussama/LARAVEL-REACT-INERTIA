@@ -6,21 +6,22 @@ import {
   TASK_STATUS_CLASS_MAP,
   TASK_STATUS_TEXT_MAP,
 } from "@/constants.js";
-export default function Show({ auth, task }) {
+export default function Show({ task }) {
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
             {`Task "${task.name}"`}
           </h2>
-          <Link
-            href={route("task.edit", task.id)}
-            className="bg-emerald-500 py-1 px-3 text-white rounded-sm shadow-sm transition-all hover:bg-emerald-600"
-          >
-            Edit
-          </Link>
+          {task.can.update && (
+            <Link
+              href={route("task.edit", task.id)}
+              className="bg-emerald-500 py-1 px-3 text-white rounded-sm shadow-sm transition-all hover:bg-emerald-600"
+            >
+              Edit
+            </Link>
+          )}
         </div>
       }
     >
@@ -28,13 +29,15 @@ export default function Show({ auth, task }) {
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-xs sm:rounded-lg">
-            <div>
-              <img
-                src={task.image_path}
-                alt=""
-                className="w-full h-64 object-cover"
-              />
-            </div>
+            {task.image_path && (
+              <div>
+                <img
+                  src={task.image_path}
+                  alt=""
+                  className="w-full h-64 object-cover"
+                />
+              </div>
+            )}
             <div className="p-6 text-gray-900 dark:text-gray-100">
               <div className="grid gap-1 grid-cols-2 mt-2">
                 <div>
@@ -76,7 +79,7 @@ export default function Show({ auth, task }) {
                   </div>
                   <div className="mt-4">
                     <label className="font-bold text-lg">Created By</label>
-                    <p className="mt-1">{task.createdBy.name}</p>
+                    <p className="mt-1">{task.createdBy?.name ?? "Deleted user"}</p>
                   </div>
                 </div>
                 <div>
@@ -90,7 +93,7 @@ export default function Show({ auth, task }) {
                   </div>
                   <div className="mt-4">
                     <label className="font-bold text-lg">Updated By</label>
-                    <p className="mt-1">{task.updatedBy.name}</p>
+                    <p className="mt-1">{task.updatedBy?.name ?? "Deleted user"}</p>
                   </div>
                   <div className="mt-4">
                     <label className="font-bold text-lg">Project</label>
@@ -105,14 +108,14 @@ export default function Show({ auth, task }) {
                   </div>
                   <div className="mt-4">
                     <label className="font-bold text-lg">Assigned User</label>
-                    <p className="mt-1">{task.assignedUser.name}</p>
+                    <p className="mt-1">{task.assignedUser?.name ?? "Unassigned"}</p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4">
                 <label className="font-bold text-lg">Task Description</label>
-                <p className="mt-1">{task.description}</p>
+                <p className="mt-1 whitespace-pre-line">{task.description}</p>
               </div>
             </div>
           </div>

@@ -6,13 +6,20 @@ import TextInput from "@/Components/TextInput";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
-export default function Create({ auth, projects, users }) {
-  const { data, setData, post, errors, reset } = useForm({
+export default function Create({ projects, users, selectedProjectId = null }) {
+  const preselected = projects.data.some((p) => p.id === selectedProjectId)
+    ? selectedProjectId
+    : "";
+
+  const { data, setData, post, errors } = useForm({
     image: "",
     name: "",
     status: "",
     description: "",
     due_date: "",
+    project_id: preselected,
+    priority: "",
+    assigned_user_id: "",
   });
 
   const onSubmit = (e) => {
@@ -23,7 +30,6 @@ export default function Create({ auth, projects, users }) {
 
   return (
     <AuthenticatedLayout
-      user={auth.user}
       header={
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
@@ -47,6 +53,7 @@ export default function Create({ auth, projects, users }) {
                 <SelectInput
                   name="project_id"
                   id="task_project_id"
+                  value={data.project_id}
                   className="mt-1 block w-full"
                   onChange={(e) => setData("project_id", e.target.value)}
                 >
@@ -59,6 +66,15 @@ export default function Create({ auth, projects, users }) {
                 </SelectInput>
 
                 <InputError message={errors.project_id} className="mt-2" />
+                {projects.data.length === 0 && (
+                  <p className="mt-2 text-sm text-amber-500">
+                    Tasks can only be added to projects you own.{" "}
+                    <Link href={route("project.create")} className="underline">
+                      Create a project
+                    </Link>{" "}
+                    first.
+                  </p>
+                )}
               </div>
               <div className="mt-4">
                 <InputLabel htmlFor="task_image_path" value="Task Image" />
@@ -122,6 +138,7 @@ export default function Create({ auth, projects, users }) {
                 <SelectInput
                   name="status"
                   id="task_status"
+                  value={data.status}
                   className="mt-1 block w-full"
                   onChange={(e) => setData("status", e.target.value)}
                 >
@@ -131,7 +148,7 @@ export default function Create({ auth, projects, users }) {
                   <option value="completed">Completed</option>
                 </SelectInput>
 
-                <InputError message={errors.task_status} className="mt-2" />
+                <InputError message={errors.status} className="mt-2" />
               </div>
 
               <div className="mt-4">
@@ -140,6 +157,7 @@ export default function Create({ auth, projects, users }) {
                 <SelectInput
                   name="priority"
                   id="task_priority"
+                  value={data.priority}
                   className="mt-1 block w-full"
                   onChange={(e) => setData("priority", e.target.value)}
                 >
@@ -161,6 +179,7 @@ export default function Create({ auth, projects, users }) {
                 <SelectInput
                   name="assigned_user_id"
                   id="task_assigned_user"
+                  value={data.assigned_user_id}
                   className="mt-1 block w-full"
                   onChange={(e) => setData("assigned_user_id", e.target.value)}
                 >
