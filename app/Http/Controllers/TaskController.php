@@ -2,163 +2,158 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\FiltersAndSortsTables;
+use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\TaskResource;
 use App\Http\Resources\UserResource;
 use App\Models\Project;
 use App\Models\Task;
-use App\Http\Requests\StoreTaskRequest;
-use App\Http\Requests\UpdateTaskRequest;
 use App\Models\User;
+use App\Support\ImageStorage;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Gate;
 
 class TaskController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    use FiltersAndSortsTables;
+
+    public const SORTABLE = ['id', 'name', 'status', 'priority', 'created_at', 'due_date'];
+
+    private const RELATIONS = ['project', 'assignedUser', 'createdBy', 'updatedBy'];
+
     public function index()
     {
-        $query = Task::query();
+        Gate::authorize('viewAny', Task::class);
 
-        $sortField = request("sort_field", 'created_at');
-        $sortDirection = request("sort_direction", "desc");
-
-        if (request("name")) {
-            $query->where("name", "like", "%" . request("name") . "%");
-        }
-        if (request("status")) {
-            $query->where("status", request("status"));
-        }
-
-        $tasks = $query->orderBy($sortField, $sortDirection)
-            ->paginate(10)
-            ->onEachSide(1);
-
-        return inertia("Task/Index", [
-            "tasks" => TaskResource::collection($tasks),
-            'queryParams' => request()->query() ?: null,
-            'success' => session('success'),
-        ]);
+        return $this->renderIndex(Task::query(), myTasks: false);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
+    public function myTasks()
+    {
+        Gate::authorize('viewAny', Task::class);
+
+        return $this->renderIndex(
+            Task::query()->where('assigned_user_id', Auth::id()),
+            myTasks: true,
+        );
+    }
+
     public function create()
     {
-        $projects = Project::query()->orderBy('name', 'asc')->get();
-        $users = User::query()->orderBy('name', 'asc')->get();
+        $projects = $this->plannableProjects();
 
-        return inertia("Task/Create", [
+        return inertia('Task/Create', [
             'projects' => ProjectResource::collection($projects),
-            'users' => UserResource::collection($users),
+            'users' => UserResource::collection(User::query()->orderBy('name')->get()),
+            'selectedProjectId' => request()->integer('project_id') ?: null,
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreTaskRequest $request)
     {
-        $data = $request->validated();
-        /** @var $image \Illuminate\Http\UploadedFile */
-        $image = $data['image'] ?? null;
+        $data = $request->safe()->except('image');
         $data['created_by'] = Auth::id();
         $data['updated_by'] = Auth::id();
-        if ($image) {
-            $data['image_path'] = $image->store('task/' . Str::random(), 'public');
+
+        if ($request->hasFile('image')) {
+            $data['image_path'] = ImageStorage::store($request->file('image'), 'task');
         }
+
         Task::create($data);
 
         return to_route('task.index')
             ->with('success', 'Task was created');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Task $task)
     {
+        Gate::authorize('view', $task);
+
         return inertia('Task/Show', [
-            'task' => new TaskResource($task),
+            'task' => new TaskResource($task->load(self::RELATIONS)),
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Task $task)
     {
-        $projects = Project::query()->orderBy('name', 'asc')->get();
-        $users = User::query()->orderBy('name', 'asc')->get();
+        Gate::authorize('update', $task);
 
-        return inertia("Task/Edit", [
-            'task' => new TaskResource($task),
+        // The current project is always listed, even for an assignee who
+        // cannot move the task to another project.
+        $projects = $this->plannableProjects()
+            ->push($task->project)
+            ->unique('id')
+            ->sortBy('name')
+            ->values();
+
+        return inertia('Task/Edit', [
+            'task' => new TaskResource($task->load(self::RELATIONS)),
             'projects' => ProjectResource::collection($projects),
-            'users' => UserResource::collection($users),
+            'users' => UserResource::collection(User::query()->orderBy('name')->get()),
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateTaskRequest $request, Task $task)
     {
-        $data = $request->validated();
-        $image = $data['image'] ?? null;
+        $data = $request->safe()->except('image');
         $data['updated_by'] = Auth::id();
-        if ($image) {
-            if ($task->image_path) {
-                Storage::disk('public')->deleteDirectory(dirname($task->image_path));
-            }
-            $data['image_path'] = $image->store('task/' . Str::random(), 'public');
+
+        if ($request->hasFile('image')) {
+            ImageStorage::delete($task->image_path);
+            $data['image_path'] = ImageStorage::store($request->file('image'), 'task');
         }
+
         $task->update($data);
 
         return to_route('task.index')
             ->with('success', "Task \"$task->name\" was updated");
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Task $task)
     {
+        Gate::authorize('delete', $task);
+
         $name = $task->name;
         $task->delete();
-        if ($task->image_path) {
-            Storage::disk('public')->deleteDirectory(dirname($task->image_path));
-        }
+        ImageStorage::delete($task->image_path);
+
         return to_route('task.index')
             ->with('success', "Task \"$name\" was deleted");
     }
 
-    public function myTasks()
+    private function renderIndex(Builder $query, bool $myTasks)
     {
-        $user = auth()->user();
-        $query = Task::query()->where('assigned_user_id', $user->id);
+        $query->with(self::RELATIONS);
 
-        $sortField = request("sort_field", 'created_at');
-        $sortDirection = request("sort_direction", "desc");
+        $this->applyContainsFilter($query, 'name');
+        $this->applyEnumFilter($query, 'status', Task::STATUSES);
+        $this->applySort($query, self::SORTABLE);
 
-        if (request("name")) {
-            $query->where("name", "like", "%" . request("name") . "%");
-        }
-        if (request("status")) {
-            $query->where("status", request("status"));
-        }
+        $tasks = $query->paginate(10)->onEachSide(1)->withQueryString();
 
-        $tasks = $query->orderBy($sortField, $sortDirection)
-            ->paginate(10)
-            ->onEachSide(1);
-
-        return inertia("Task/Index", [
-            "tasks" => TaskResource::collection($tasks),
-            'queryParams' => request()->query() ?: null,
+        return inertia('Task/Index', [
+            'tasks' => TaskResource::collection($tasks),
+            'queryParams' => $this->tableQueryParams(),
             'success' => session('success'),
+            'myTasks' => $myTasks,
         ]);
+    }
+
+    /**
+     * Projects in which the current user may create tasks.
+     */
+    private function plannableProjects()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        return Project::query()
+            ->with(['createdBy', 'updatedBy'])
+            ->unless($user->isAdmin(), fn ($query) => $query->where('created_by', $user->id))
+            ->orderBy('name')
+            ->get();
     }
 }

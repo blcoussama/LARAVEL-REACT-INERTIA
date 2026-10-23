@@ -5,9 +5,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
-// use Illuminate\Foundation\Application;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::redirect('/', '/dashboard');
 
@@ -19,7 +18,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/task/my-tasks', [TaskController::class, 'myTasks'])
         ->name('task.myTasks');
     Route::resource('task', TaskController::class);
-    Route::resource('user', UserController::class);
+
+    // User management is reserved to administrators (UserPolicy). The route
+    // middleware is a second line of defence on top of the controller checks.
+    Route::resource('user', UserController::class)
+        ->middleware('can:viewAny,'.User::class);
 });
 
 Route::middleware('auth')->group(function () {
@@ -28,4 +31,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

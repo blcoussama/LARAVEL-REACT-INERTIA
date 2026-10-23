@@ -2,106 +2,136 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\UserCrudResource;
-use App\Models\User;
+use App\Http\Controllers\Concerns\FiltersAndSortsTables;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Http\Resources\TaskResource;
+use App\Http\Resources\UserCrudResource;
+use App\Models\Task;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
 
+/**
+ * Administration of the accounts. The routes are also protected by the
+ * "can:viewAny,App\Models\User" middleware (see routes/web.php).
+ */
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    use FiltersAndSortsTables;
+
+    private const SORTABLE = ['id', 'name', 'email', 'role', 'created_at'];
+
     public function index()
     {
+        Gate::authorize('viewAny', User::class);
+
         $query = User::query();
 
-        $sortField = request("sort_field", 'created_at');
-        $sortDirection = request("sort_direction", "desc");
+        $this->applyContainsFilter($query, 'name');
+        $this->applyContainsFilter($query, 'email');
+        $this->applySort($query, self::SORTABLE);
 
-        if (request("name")) {
-            $query->where("name", "like", "%" . request("name") . "%");
-        }
-        if (request("email")) {
-            $query->where("email", "like", "%" . request("email") . "%");
-        }
+        $users = $query->paginate(10)->onEachSide(1)->withQueryString();
 
-        $users = $query->orderBy($sortField, $sortDirection)
-            ->paginate(10)
-            ->onEachSide(1);
-
-        return inertia("User/Index", [
-            "users" => UserCrudResource::collection($users),
-            'queryParams' => request()->query() ?: null,
+        return inertia('User/Index', [
+            'users' => UserCrudResource::collection($users),
+            'queryParams' => $this->tableQueryParams(),
             'success' => session('success'),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        return inertia("User/Create");
+        Gate::authorize('create', User::class);
+
+        return inertia('User/Create', ['roles' => User::ROLES]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Accounts created by an administrator are considered verified.
      */
     public function store(StoreUserRequest $request)
     {
         $data = $request->validated();
-        $data['email_verified_at'] = time();
-        $data['password'] = bcrypt($data['password']);
-        User::create($data);
+
+        $user = new User([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+        ]);
+        $user->role = $data['role'];
+        $user->email_verified_at = now();
+        $user->save();
 
         return to_route('user.index')
             ->with('success', 'User was created');
     }
 
     /**
-     * Display the specified resource.
+     * Profile of a user with the tasks assigned to them.
      */
     public function show(User $user)
     {
-        //
-    }
+        Gate::authorize('view', $user);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(User $user)
-    {
-        return inertia('User/Edit', [
-            'user' => new UserCrudResource($user),
+        $query = Task::query()
+            ->where('assigned_user_id', $user->id)
+            ->with(['project', 'assignedUser', 'createdBy', 'updatedBy']);
+
+        $this->applyContainsFilter($query, 'name');
+        $this->applyEnumFilter($query, 'status', Task::STATUSES);
+        $this->applySort($query, TaskController::SORTABLE);
+
+        $tasks = $query->paginate(10)->onEachSide(1)->withQueryString();
+
+        return inertia('User/Show', [
+            'user' => new UserCrudResource($user->loadCount(['projects', 'assignedTasks'])),
+            'tasks' => TaskResource::collection($tasks),
+            'queryParams' => $this->tableQueryParams(),
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+    public function edit(User $user)
+    {
+        Gate::authorize('update', $user);
+
+        return inertia('User/Edit', [
+            'user' => new UserCrudResource($user),
+            'roles' => User::ROLES,
+        ]);
+    }
+
     public function update(UpdateUserRequest $request, User $user)
     {
         $data = $request->validated();
-        $password = $data['password'] ?? null;
-        if ($password) {
-            $data['password'] = bcrypt($password);
-        } else {
-            unset($data['password']);
+
+        $user->fill([
+            'name' => $data['name'],
+            'email' => $data['email'],
+        ]);
+
+        if (! empty($data['password'])) {
+            $user->password = Hash::make($data['password']);
         }
-        $user->update($data);
+
+        if (isset($data['role']) && $request->user()->can('changeRole', $user)) {
+            $user->role = $data['role'];
+        }
+
+        $user->save();
 
         return to_route('user.index')
             ->with('success', "User \"$user->name\" was updated");
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(User $user)
     {
+        Gate::authorize('delete', $user);
+
         $name = $user->name;
         $user->delete();
+
         return to_route('user.index')
             ->with('success', "User \"$name\" was deleted");
     }

@@ -2,126 +2,107 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\FiltersAndSortsTables;
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Project;
-use App\Http\Requests\StoreProjectRequest;
-use App\Http\Requests\UpdateProjectRequest;
+use App\Models\Task;
+use App\Support\ImageStorage;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class ProjectController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    use FiltersAndSortsTables;
+
+    private const SORTABLE = ['id', 'name', 'status', 'created_at', 'due_date'];
+
     public function index()
     {
-        $query = Project::query();
+        Gate::authorize('viewAny', Project::class);
 
-        $sortField = request("sort_field", 'created_at');
-        $sortDirection = request("sort_direction", "desc");
+        $query = Project::query()->with(['createdBy', 'updatedBy']);
 
-        if (request("name")) {
-            $query->where("name", "like", "%" . request("name") . "%");
-        }
-        if (request("status")) {
-            $query->where("status", request("status"));
-        }
+        $this->applyContainsFilter($query, 'name');
+        $this->applyEnumFilter($query, 'status', Project::STATUSES);
+        $this->applySort($query, self::SORTABLE);
 
-        // ADD THIS LINE - eager load the relationships:
-        $projects = $query->with(['createdBy', 'updatedBy'])
-            ->orderBy($sortField, $sortDirection)
-            ->paginate(10)
-            ->onEachSide(1);
+        $projects = $query->paginate(10)->onEachSide(1)->withQueryString();
 
-        return inertia("Project/Index", [
-            "projects" => ProjectResource::collection($projects),
-            'queryParams' => request()->query() ?: null,
+        return inertia('Project/Index', [
+            'projects' => ProjectResource::collection($projects),
+            'queryParams' => $this->tableQueryParams(),
             'success' => session('success'),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        return inertia("Project/Create");
+        Gate::authorize('create', Project::class);
+
+        return inertia('Project/Create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreProjectRequest $request)
     {
-        $data = $request->validated();
-        /** @var $image \Illuminate\Http\UploadedFile */
-        $image = $data['image'] ?? null;
+        $data = $request->safe()->except('image');
         $data['created_by'] = Auth::id();
         $data['updated_by'] = Auth::id();
-        if ($image) {
-            $data['image_path'] = $image->store('project/' . Str::random(), 'public');
+
+        if ($request->hasFile('image')) {
+            $data['image_path'] = ImageStorage::store($request->file('image'), 'project');
         }
+
         Project::create($data);
 
         return to_route('project.index')
             ->with('success', 'Project was created');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Project $project)
     {
-        $query = $project->tasks();
+        Gate::authorize('view', $project);
 
-        $sortField = request("sort_field", 'created_at');
-        $sortDirection = request("sort_direction", "desc");
+        $project->load(['createdBy', 'updatedBy']);
 
-        if (request("name")) {
-            $query->where("name", "like", "%" . request("name") . "%");
-        }
-        if (request("status")) {
-            $query->where("status", request("status"));
-        }
+        $query = $project->tasks()->with(['project', 'assignedUser', 'createdBy', 'updatedBy']);
 
-        $tasks = $query->orderBy($sortField, $sortDirection)
-            ->paginate(10)
-            ->onEachSide(1);
+        $this->applyContainsFilter($query, 'name');
+        $this->applyEnumFilter($query, 'status', Task::STATUSES);
+        $this->applySort($query, TaskController::SORTABLE);
+
+        $tasks = $query->paginate(10)->onEachSide(1)->withQueryString();
+
         return inertia('Project/Show', [
             'project' => new ProjectResource($project),
-            "tasks" => TaskResource::collection($tasks),
-            'queryParams' => request()->query() ?: null,
+            'tasks' => TaskResource::collection($tasks),
+            'queryParams' => $this->tableQueryParams(),
             'success' => session('success'),
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Project $project)
     {
+        Gate::authorize('update', $project);
+
         return inertia('Project/Edit', [
-            'project' => new ProjectResource($project),
+            'project' => new ProjectResource($project->load(['createdBy', 'updatedBy'])),
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateProjectRequest $request, Project $project)
     {
-        $data = $request->validated();
-        $image = $data['image'] ?? null;
+        $data = $request->safe()->except('image');
         $data['updated_by'] = Auth::id();
-        if ($image) {
-            if ($project->image_path) {
-                Storage::disk('public')->deleteDirectory(dirname($project->image_path));
-            }
-            $data['image_path'] = $image->store('project/' . Str::random(), 'public');
+
+        if ($request->hasFile('image')) {
+            ImageStorage::delete($project->image_path);
+            $data['image_path'] = ImageStorage::store($request->file('image'), 'project');
         }
+
         $project->update($data);
 
         return to_route('project.index')
@@ -129,15 +110,21 @@ class ProjectController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * The tasks of the project are deleted by the database (ON DELETE
+     * CASCADE); their images are removed from the disk here.
      */
     public function destroy(Project $project)
     {
+        Gate::authorize('delete', $project);
+
         $name = $project->name;
-        $project->delete();
-        if ($project->image_path) {
-            Storage::disk('public')->deleteDirectory(dirname($project->image_path));
-        }
+        $images = $project->tasks()->whereNotNull('image_path')->pluck('image_path')
+            ->push($project->image_path);
+
+        DB::transaction(fn () => $project->delete());
+
+        $images->each(fn (?string $path) => ImageStorage::delete($path));
+
         return to_route('project.index')
             ->with('success', "Project \"$name\" was deleted");
     }
