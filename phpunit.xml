@@ -19,6 +19,8 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Test-only key: base64 of "testing-only-key-not-a-secret-32". Never used outside the test suite. -->
+        <env name="APP_KEY" value="base64:dGVzdGluZy1vbmx5LWtleS1ub3QtYS1zZWNyZXQtMzI="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
